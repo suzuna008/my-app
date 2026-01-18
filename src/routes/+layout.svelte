@@ -1,11 +1,17 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
-    import '../app.css';
-	import { PUBLIC_GOOGLE_MAPS_API_KEY } from '$env/static/public';
+	import '../app.css';
+	import { env } from '$env/dynamic/public';
+	import { onMount } from 'svelte';
+	import { initAuth } from '$lib/stores/auth';
 
 	let { children } = $props();
 
-	console.log('env =', PUBLIC_GOOGLE_MAPS_API_KEY)
+	const { PUBLIC_GOOGLE_MAPS_API_KEY } = env;
+
+	onMount(() => {
+		initAuth();
+	});
 </script>
 
 <svelte:head>

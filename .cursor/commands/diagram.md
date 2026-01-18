@@ -1,0 +1,1 @@
+Draw a simple diagram that explains how the app works. Include how the data is fetched, how state is computed, and the UI etc. include key relevant details but exclude noise. This is so I can understand the codebase better to make better overall decisions.
