@@ -1,5 +1,10 @@
 // Shared types for the application
 
+export interface Tag {
+    id: string;
+    name: string;
+}
+
 export interface Spot {
     id: string;
     name: string;
@@ -8,6 +13,7 @@ export interface Spot {
     lng: number;
     placeId: string;
     display_order?: number;
+    tags?: Tag[];
 }
 
 export interface Category {

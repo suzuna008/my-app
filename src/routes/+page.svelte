@@ -4,14 +4,19 @@
 
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
+    import { get } from 'svelte/store';
     import { user } from '$lib/stores/auth';
     import { 
         categories, 
         loading,
+        filteredCategories,
+        tags,
+        selectedTagFilter,
         loadCategories, 
         clearCategories,
         addCategory,
         removeCategory,
+        updateCategoryName,
         toggleCategoryExpanded,
         addSpot,
         removeSpot,
@@ -19,7 +24,12 @@
         updateCategoryOrder,
         updateSpotOrder,
         setupRealtimeSubscriptions,
-        cleanupRealtimeSubscriptions
+        cleanupRealtimeSubscriptions,
+        addTag,
+        removeTag,
+        addTagToSpot,
+        removeTagFromSpot,
+        setTagFilter
     } from '$lib/stores/spots';
     import { 
         escapeHtml, 
@@ -29,7 +39,7 @@
         textSearch,
         isAddressPattern
     } from '$lib/utils/places';
-    import type { SelectedPlace, PlaceDetails } from '$lib/types';
+    import type { SelectedPlace, PlaceDetails, Spot } from '$lib/types';
     import Auth from '$lib/components/Auth.svelte';
 
     // Map state (not in store - component-local)
@@ -49,8 +59,14 @@
     let showAutocomplete = false;
     let categoryModalOpen = false;
     let spotModalOpen = false;
+    let tagModalOpen = false;
     let newCategoryName = '';
     let selectedCategoryId = '';
+    let selectedSpotForTags: Spot | null = null;
+    let newTagName = '';
+    let tagInputValue = '';
+    let editingCategoryId: string | null = null;
+    let editingCategoryName = '';
 
     // Auth subscription
     const unsubUser = user.subscribe(async (u) => {
@@ -87,8 +103,11 @@
         cleanupRealtimeSubscriptions();
     });
 
+    // Use filtered categories when tag filter is active
+    $: displayCategories = $selectedTagFilter ? $filteredCategories : $categories;
+    
     // Update markers whenever categories change
-    $: if (map && $categories) {
+    $: if (map && displayCategories) {
         updateMarkers();
     }
 
@@ -384,7 +403,7 @@
         markers.filter(m => m.isSavedSpot).forEach(m => m.setMap(null));
         markers = markers.filter(m => !m.isSavedSpot);
 
-        $categories.forEach(category => {
+        displayCategories.forEach(category => {
             category.spots.forEach(spot => {
                 const marker = new google.maps.Marker({
                     position: { lat: spot.lat, lng: spot.lng },
@@ -548,6 +567,37 @@
         }
     }
 
+    function startEditingCategory(categoryId: string, currentName: string) {
+        editingCategoryId = categoryId;
+        editingCategoryName = currentName;
+    }
+
+    function cancelEditingCategory() {
+        editingCategoryId = null;
+        editingCategoryName = '';
+    }
+
+    async function saveCategoryName(categoryId: string) {
+        if (!editingCategoryName.trim()) {
+            alert('Category name cannot be empty');
+            return;
+        }
+        
+        if (!$user) {
+            alert('Please sign in');
+            return;
+        }
+
+        try {
+            await updateCategoryName(categoryId, editingCategoryName.trim());
+            editingCategoryId = null;
+            editingCategoryName = '';
+        } catch (e) {
+            console.error('Failed to update category name:', e);
+            alert('Failed to update category name: ' + (e instanceof Error ? e.message : 'Unknown error'));
+        }
+    }
+
     // Spot management
     async function handleSaveSpot() {
         if (!selectedCategoryId || !currentSelectedPlace) return;
@@ -628,6 +678,86 @@
             }
         });
     }
+
+    // Tag management functions
+    function openTagModal(spot: Spot) {
+        selectedSpotForTags = spot;
+        tagModalOpen = true;
+        tagInputValue = '';
+    }
+
+    async function handleAddTagToSpot() {
+        if (!selectedSpotForTags || !tagInputValue.trim()) return;
+        if (!$user) {
+            alert('Please sign in');
+            return;
+        }
+
+        try {
+            const tagName = tagInputValue.trim();
+            
+            // Check if tag already exists on this spot
+            if (!selectedSpotForTags) return;
+            const existingTags = selectedSpotForTags.tags || [];
+            if (existingTags.some((t: { name: string }) => t.name.toLowerCase() === tagName.toLowerCase())) {
+                // Tag already exists, just clear the input
+                tagInputValue = '';
+                return;
+            }
+            
+            // Create tag if it doesn't exist, or get existing tag
+            const newTag = await addTag(tagName);
+            // Add tag to spot
+            await addTagToSpot(selectedSpotForTags.id, newTag.id);
+            tagInputValue = '';
+            
+            // Update selectedSpotForTags to reflect the new tag
+            const updatedCategories = get(categories);
+            for (const cat of updatedCategories) {
+                const updatedSpot = cat.spots.find((s: Spot) => s.id === selectedSpotForTags.id);
+                if (updatedSpot) {
+                    selectedSpotForTags = updatedSpot;
+                    break;
+                }
+            }
+        } catch (e: any) {
+            console.error('Failed to add tag:', e);
+            // Only show error if it's not a duplicate/conflict error
+            if (!e?.message?.includes('duplicate') && e?.code !== '23505') {
+                alert('Failed to add tag: ' + (e?.message || 'Unknown error'));
+            }
+            // If it's a duplicate, the tag is already there, so we can silently succeed
+        }
+    }
+
+    async function handleRemoveTagFromSpot(spotId: string, tagId: string) {
+        if (!$user) {
+            alert('Please sign in');
+            return;
+        }
+
+        try {
+            await removeTagFromSpot(spotId, tagId);
+            
+            // Update selectedSpotForTags to reflect the removed tag
+            if (selectedSpotForTags && selectedSpotForTags.id === spotId) {
+                const updatedCategories = get(categories);
+                for (const cat of updatedCategories) {
+                    const updatedSpot = cat.spots.find((s: Spot) => s.id === spotId);
+                    if (updatedSpot) {
+                        selectedSpotForTags = updatedSpot;
+                        break;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Failed to remove tag:', e);
+        }
+    }
+
+    function handleTagFilter(tagId: string | null) {
+        setTagFilter(tagId);
+    }
 </script>
 
 <div class="container">
@@ -697,26 +827,106 @@
                 <button class="add-btn" on:click={() => categoryModalOpen = true} title="Add Category">+</button>
             </div>
             
+            <!-- Tag Filter Section -->
+            <div class="tag-filter-section">
+                <div class="tag-filter-header">
+                    <h3>Filter by Tag</h3>
+                    {#if $selectedTagFilter}
+                        <button 
+                            type="button"
+                            class="clear-filter-btn" 
+                            on:click={() => handleTagFilter(null)}
+                            title="Clear filter"
+                        >
+                            ✕
+                        </button>
+                    {/if}
+                </div>
+                <div class="tags-list">
+                    {#if $tags.length === 0}
+                        <div class="empty-tags">No tags yet</div>
+                    {:else}
+                        {#each $tags as tag}
+                            <button
+                                type="button"
+                                class="tag-chip"
+                                class:active={$selectedTagFilter === tag.id}
+                                on:click={() => handleTagFilter($selectedTagFilter === tag.id ? null : tag.id)}
+                            >
+                                {tag.name}
+                            </button>
+                        {/each}
+                    {/if}
+                </div>
+            </div>
+            
             <div class="categories-list">
                 {#if $loading}
                     <div class="empty-state">Loading...</div>
-                {:else if $categories.length === 0}
+                {:else if displayCategories.length === 0}
                     <div class="empty-state">
-                        <p>No categories yet</p>
-                        <p>Click + to create one</p>
+                        {#if $selectedTagFilter}
+                            <p>No spots match this tag</p>
+                        {:else}
+                            <p>No categories yet</p>
+                            <p>Click + to create one</p>
+                        {/if}
                     </div>
                 {:else}
-                    {#each $categories as category (category.id)}
+                    {#each displayCategories as category (category.id)}
                         <div class="category-item" class:expanded={category.expanded}>
                             <div class="category-header">
-                                <button type="button" class="category-name-btn" on:click={() => toggleCategoryExpanded(category.id)}>
-                                    {category.name}
-                                </button>
-                                <button 
-                                    type="button"
-                                    class="category-delete-btn" 
-                                    on:click={() => handleDeleteCategory(category.id)}
-                                >🗑️</button>
+                                {#if editingCategoryId === category.id}
+                                    <div class="category-edit-container">
+                                        <!-- svelte-ignore a11y-autofocus -->
+                                        <input 
+                                            type="text" 
+                                            bind:value={editingCategoryName}
+                                            class="category-edit-input"
+                                            on:keydown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    saveCategoryName(category.id);
+                                                } else if (e.key === 'Escape') {
+                                                    cancelEditingCategory();
+                                                }
+                                            }}
+                                            on:blur={() => saveCategoryName(category.id)}
+                                            autofocus
+                                        >
+                                        <button 
+                                            type="button"
+                                            class="category-save-btn" 
+                                            on:click={() => saveCategoryName(category.id)}
+                                            title="Save"
+                                        >✓</button>
+                                        <button 
+                                            type="button"
+                                            class="category-cancel-btn" 
+                                            on:click={cancelEditingCategory}
+                                            title="Cancel"
+                                        >✕</button>
+                                    </div>
+                                {:else}
+                                    <button 
+                                        type="button" 
+                                        class="category-name-btn" 
+                                        on:click={() => toggleCategoryExpanded(category.id)}
+                                        on:dblclick|stopPropagation={() => startEditingCategory(category.id, category.name)}
+                                    >
+                                        {category.name}
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        class="category-edit-btn" 
+                                        on:click|stopPropagation={() => startEditingCategory(category.id, category.name)}
+                                        title="Edit category name"
+                                    >✏️</button>
+                                    <button 
+                                        type="button"
+                                        class="category-delete-btn" 
+                                        on:click={() => handleDeleteCategory(category.id)}
+                                    >🗑️</button>
+                                {/if}
                             </div>
                             <div class="spots-list">
                                 {#if category.spots.length === 0}
@@ -726,18 +936,35 @@
                                 {:else}
                                     {#each category.spots as spot (spot.id)}
                                         <div class="spot-item">
-                                            <button 
-                                                type="button"
-                                                class="spot-name-btn" 
-                                                on:click={() => showSpotOnMap(spot, category.name)}
-                                            >
-                                                {spot.name}
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                class="spot-delete-btn" 
-                                                on:click={() => handleDeleteSpot(category.id, spot.id)}
-                                            >🗑️</button>
+                                            <div class="spot-content">
+                                                <button 
+                                                    type="button"
+                                                    class="spot-name-btn" 
+                                                    on:click={() => showSpotOnMap(spot, category.name)}
+                                                >
+                                                    {spot.name}
+                                                </button>
+                                                {#if spot.tags && spot.tags.length > 0}
+                                                    <div class="spot-tags">
+                                                        {#each spot.tags as tag}
+                                                            <span class="spot-tag">{tag.name}</span>
+                                                        {/each}
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                            <div class="spot-actions">
+                                                <button 
+                                                    type="button"
+                                                    class="spot-tag-btn" 
+                                                    on:click={() => openTagModal(spot)}
+                                                    title="Manage tags"
+                                                >🏷️</button>
+                                                <button 
+                                                    type="button"
+                                                    class="spot-delete-btn" 
+                                                    on:click={() => handleDeleteSpot(category.id, spot.id)}
+                                                >🗑️</button>
+                                            </div>
                                         </div>
                                     {/each}
                                 {/if}
@@ -785,6 +1012,48 @@
                         {/each}
                     </select>
                     <button class="save-btn" on:click={handleSaveSpot}>Save Spot</button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Tag Management Modal -->
+    {#if tagModalOpen && selectedSpotForTags}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div class="modal" style="display: block" on:click|self={() => tagModalOpen = false}>
+            <div class="modal-content">
+                <button type="button" class="close" on:click={() => tagModalOpen = false}>&times;</button>
+                <h3>Manage Tags: {selectedSpotForTags.name}</h3>
+                
+                <div class="tag-input-section">
+                    <input 
+                        type="text" 
+                        bind:value={tagInputValue}
+                        on:keydown={(e) => e.key === 'Enter' && handleAddTagToSpot()}
+                        placeholder="Add a tag..."
+                        class="tag-input"
+                    >
+                    <button class="add-tag-btn" on:click={handleAddTagToSpot}>Add Tag</button>
+                </div>
+                
+                <div class="current-tags-section">
+                    <h4>Current Tags:</h4>
+                    {#if selectedSpotForTags.tags && selectedSpotForTags.tags.length > 0}
+                        <div class="tags-list-modal">
+                            {#each selectedSpotForTags.tags as tag}
+                                <div class="tag-chip-modal">
+                                    <span>{tag.name}</span>
+                                    <button 
+                                        type="button"
+                                        class="remove-tag-btn" 
+                                        on:click={() => handleRemoveTagFromSpot(selectedSpotForTags!.id, tag.id)}
+                                    >×</button>
+                                </div>
+                            {/each}
+                        </div>
+                    {:else}
+                        <p class="no-tags">No tags yet. Add tags to organize and filter spots.</p>
+                    {/if}
                 </div>
             </div>
         </div>

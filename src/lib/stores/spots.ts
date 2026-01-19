@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { Category, Spot } from '$lib/types';
+import type { Category, Spot, Tag } from '$lib/types';
 import {
     getCategoriesWithSpots,
     createCategory as createCategoryInDb,
@@ -11,6 +11,11 @@ import {
     subscribeToCategories,
     subscribeToSpots,
     unsubscribeAll,
+    getTags as getTagsFromDb,
+    createTag as createTagInDb,
+    deleteTag as deleteTagInDb,
+    addTagToSpot as addTagToSpotInDb,
+    removeTagFromSpot as removeTagFromSpotInDb,
     type Category as DbCategory,
     type Spot as DbSpot
 } from '$lib/supabase';
@@ -21,10 +26,29 @@ const DEFAULT_CATEGORIES = ['Favourite', 'Blacklist'];
 // Core state
 export const categories = writable<Category[]>([]);
 export const loading = writable(false);
+export const tags = writable<Tag[]>([]);
+export const selectedTagFilter = writable<string | null>(null);
 
 // Derived state
 export const totalSpots = derived(categories, $categories => 
     $categories.reduce((sum, cat) => sum + cat.spots.length, 0)
+);
+
+// Filtered categories based on selected tag
+export const filteredCategories = derived(
+    [categories, selectedTagFilter],
+    ([$categories, $selectedTagFilter]) => {
+        if (!$selectedTagFilter) {
+            return $categories;
+        }
+        
+        return $categories.map(cat => ({
+            ...cat,
+            spots: cat.spots.filter(spot => 
+                spot.tags?.some(tag => tag.id === $selectedTagFilter)
+            )
+        })).filter(cat => cat.spots.length > 0);
+    }
 );
 
 // Transform DB format to local format
@@ -38,7 +62,7 @@ function dbCategoryToLocal(cat: DbCategory, spots: Spot[] = []): Category {
     };
 }
 
-function dbSpotToLocal(spot: DbSpot): Spot {
+function dbSpotToLocal(spot: DbSpot & { tags?: Tag[] }): Spot {
     return {
         id: spot.id,
         name: spot.name,
@@ -46,7 +70,8 @@ function dbSpotToLocal(spot: DbSpot): Spot {
         lat: spot.lat,
         lng: spot.lng,
         placeId: spot.place_id || '',
-        display_order: spot.display_order
+        display_order: spot.display_order,
+        tags: spot.tags || []
     };
 }
 
@@ -107,12 +132,30 @@ export async function loadCategories() {
         await ensureDefaultCategories(loadedCategories);
     }
     
+    // Load tags
+    await loadTags();
+    
     loading.set(false);
+}
+
+// Load all tags
+export async function loadTags() {
+    const { data, error } = await getTagsFromDb();
+    if (error) {
+        console.error('Error loading tags:', error);
+        return;
+    }
+    
+    if (data) {
+        tags.set(data.map(tag => ({ id: tag.id, name: tag.name })));
+    }
 }
 
 // Clear all data (on logout)
 export function clearCategories() {
     categories.set([]);
+    tags.set([]);
+    selectedTagFilter.set(null);
 }
 
 // Category operations
@@ -152,6 +195,19 @@ export async function toggleCategoryExpanded(id: string) {
     
     categories.update(cats => cats.map(c => 
         c.id === id ? { ...c, expanded: newExpanded } : c
+    ));
+}
+
+export async function updateCategoryName(id: string, newName: string) {
+    if (!newName.trim()) {
+        throw new Error('Category name cannot be empty');
+    }
+    
+    const { error } = await updateCategoryInDb(id, { name: newName.trim() });
+    if (error) throw error;
+    
+    categories.update(cats => cats.map(c => 
+        c.id === id ? { ...c, name: newName.trim() } : c
     ));
 }
 
@@ -222,6 +278,119 @@ export async function updateSpotOrder(spotId: string, newOrder: number) {
     await updateSpotInDb(spotId, { display_order: newOrder });
 }
 
+// Tag operations
+export async function addTag(name: string): Promise<Tag> {
+    const { data, error } = await createTagInDb(name);
+    if (error) throw error;
+    if (!data) throw new Error('No data returned');
+    
+    const newTag = { id: data.id, name: data.name };
+    tags.update(tags => {
+        const exists = tags.find(t => t.id === newTag.id);
+        if (exists) return tags;
+        return [...tags, newTag].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    
+    return newTag;
+}
+
+export async function removeTag(id: string) {
+    const { error } = await deleteTagInDb(id);
+    if (error) throw error;
+    
+    tags.update(tags => tags.filter(t => t.id !== id));
+    
+    // Clear filter if the removed tag was selected
+    const currentFilter = get(selectedTagFilter);
+    if (currentFilter === id) {
+        selectedTagFilter.set(null);
+    }
+}
+
+export async function addTagToSpot(spotId: string, tagId: string) {
+    // Check if tag already exists on this spot before calling database
+    const currentCategories = get(categories);
+    const spot = currentCategories
+        .flatMap(cat => cat.spots)
+        .find(s => s.id === spotId);
+    
+    if (spot && spot.tags?.some(t => t.id === tagId)) {
+        // Tag already exists, no need to add it again
+        return;
+    }
+    
+    const { error } = await addTagToSpotInDb(spotId, tagId);
+    if (error) {
+        // Check if it's a duplicate key error (unique constraint violation)
+        // This can happen if the tag was added between our check and the insert
+        if (error.message?.includes('duplicate') || error.code === '23505') {
+            // Tag already exists in database, just update local state
+            const currentTags = get(tags);
+            const tag = currentTags.find(t => t.id === tagId);
+            if (tag) {
+                categories.update(cats => cats.map(cat => ({
+                    ...cat,
+                    spots: cat.spots.map(s => {
+                        if (s.id === spotId) {
+                            const existingTags = s.tags || [];
+                            if (!existingTags.find(t => t.id === tagId)) {
+                                return { ...s, tags: [...existingTags, tag] };
+                            }
+                        }
+                        return s;
+                    })
+                })));
+            }
+            return; // Successfully handled, don't throw error
+        }
+        throw error;
+    }
+    
+    // Update local state
+    const currentTags = get(tags);
+    const tag = currentTags.find(t => t.id === tagId);
+    if (!tag) return;
+    
+    categories.update(cats => cats.map(cat => ({
+        ...cat,
+        spots: cat.spots.map(spot => {
+            if (spot.id === spotId) {
+                const existingTags = spot.tags || [];
+                if (existingTags.find(t => t.id === tagId)) {
+                    return spot; // Tag already exists
+                }
+                return {
+                    ...spot,
+                    tags: [...existingTags, tag]
+                };
+            }
+            return spot;
+        })
+    })));
+}
+
+export async function removeTagFromSpot(spotId: string, tagId: string) {
+    const { error } = await removeTagFromSpotInDb(spotId, tagId);
+    if (error) throw error;
+    
+    categories.update(cats => cats.map(cat => ({
+        ...cat,
+        spots: cat.spots.map(spot => {
+            if (spot.id === spotId) {
+                return {
+                    ...spot,
+                    tags: (spot.tags || []).filter(t => t.id !== tagId)
+                };
+            }
+            return spot;
+        })
+    })));
+}
+
+export function setTagFilter(tagId: string | null) {
+    selectedTagFilter.set(tagId);
+}
+
 // Real-time subscription handlers
 let unsubCats: (() => void) | null = null;
 let unsubSpots: (() => void) | null = null;
@@ -283,10 +452,20 @@ export function setupRealtimeSubscriptions() {
                     if (newData) {
                         return cats.map(c => ({
                             ...c,
-                            spots: c.spots.map(s => s.id === newData.id 
-                                ? { ...s, name: newData.name, address: newData.address || '', display_order: newData.display_order }
-                                : s
-                            ).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+                            spots: c.spots.map(s => {
+                                if (s.id === newData.id) {
+                                    // Preserve existing tags when updating
+                                    const existingSpot = c.spots.find(sp => sp.id === newData.id);
+                                    return {
+                                        ...s,
+                                        name: newData.name,
+                                        address: newData.address || '',
+                                        display_order: newData.display_order,
+                                        tags: existingSpot?.tags || []
+                                    };
+                                }
+                                return s;
+                            }).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
                         }));
                     }
                     break;

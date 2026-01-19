@@ -30,6 +30,14 @@ export interface Spot {
   updated_at: string;
 }
 
+export interface Tag {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Auth helpers
 export async function signUp(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({ email, password });
@@ -153,7 +161,119 @@ export async function deleteSpot(id: string) {
   return { error };
 }
 
-// Get all categories with their spots
+// Tag operations
+export async function getTags() {
+  const user = await getUser();
+  if (!user) return { data: null, error: new Error('Not authenticated') };
+  
+  const { data, error } = await supabase
+    .from('tags')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('name', { ascending: true });
+  return { data, error };
+}
+
+export async function createTag(name: string) {
+  const user = await getUser();
+  if (!user) return { data: null, error: new Error('Not authenticated') };
+  
+  // Check if tag already exists for this user
+  const { data: existing } = await supabase
+    .from('tags')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('name', name.trim())
+    .single();
+  
+  if (existing) {
+    return { data: existing, error: null };
+  }
+  
+  const { data, error } = await supabase
+    .from('tags')
+    .insert({ name: name.trim(), user_id: user.id })
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function deleteTag(id: string) {
+  const { error } = await supabase
+    .from('tags')
+    .delete()
+    .eq('id', id);
+  return { error };
+}
+
+// Spot-Tag relationship operations
+export async function addTagToSpot(spotId: string, tagId: string) {
+  // Check if the relationship already exists
+  const { data: existing } = await supabase
+    .from('spot_tags')
+    .select('spot_id, tag_id')
+    .eq('spot_id', spotId)
+    .eq('tag_id', tagId)
+    .single();
+  
+  // If it already exists, return success without inserting
+  if (existing) {
+    return { data: existing, error: null };
+  }
+  
+  // Otherwise, insert the new relationship
+  const { data, error } = await supabase
+    .from('spot_tags')
+    .insert({ spot_id: spotId, tag_id: tagId })
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function removeTagFromSpot(spotId: string, tagId: string) {
+  const { error } = await supabase
+    .from('spot_tags')
+    .delete()
+    .eq('spot_id', spotId)
+    .eq('tag_id', tagId);
+  return { error };
+}
+
+export async function getSpotTags(spotId: string) {
+  const { data, error } = await supabase
+    .from('spot_tags')
+    .select(`
+      tag_id,
+      tags:tags(id, name)
+    `)
+    .eq('spot_id', spotId);
+  
+  if (error) return { data: null, error };
+  
+  const tags = (data || []).map((item: any) => ({
+    id: item.tags.id,
+    name: item.tags.name
+  }));
+  
+  return { data: tags, error: null };
+}
+
+export async function getSpotsByTag(tagId: string) {
+  const { data, error } = await supabase
+    .from('spot_tags')
+    .select(`
+      spot_id,
+      spots:spots(*)
+    `)
+    .eq('tag_id', tagId);
+  
+  if (error) return { data: null, error };
+  
+  const spots = (data || []).map((item: any) => item.spots);
+  return { data: spots, error: null };
+}
+
+// Get all categories with their spots (including tags)
 export async function getCategoriesWithSpots() {
   const { data: categories, error: catError } = await getCategories();
   if (catError || !categories) return { data: null, error: catError };
@@ -161,10 +281,37 @@ export async function getCategoriesWithSpots() {
   const { data: spots, error: spotError } = await getSpots();
   if (spotError) return { data: null, error: spotError };
   
-  // Group spots by category
+  // Get all tags for all spots
+  const spotIds = (spots || []).map(s => s.id);
+  const { data: spotTagsData } = await supabase
+    .from('spot_tags')
+    .select(`
+      spot_id,
+      tags:tags(id, name)
+    `)
+    .in('spot_id', spotIds);
+  
+  // Create a map of spot_id -> tags[]
+  const tagsMap = new Map<string, Array<{ id: string; name: string }>>();
+  (spotTagsData || []).forEach((item: any) => {
+    if (!tagsMap.has(item.spot_id)) {
+      tagsMap.set(item.spot_id, []);
+    }
+    tagsMap.get(item.spot_id)!.push({
+      id: item.tags.id,
+      name: item.tags.name
+    });
+  });
+  
+  // Group spots by category and add tags
   const categoriesWithSpots = categories.map(cat => ({
     ...cat,
-    spots: (spots || []).filter(spot => spot.category_id === cat.id)
+    spots: (spots || [])
+      .filter(spot => spot.category_id === cat.id)
+      .map(spot => ({
+        ...spot,
+        tags: tagsMap.get(spot.id) || []
+      }))
   }));
   
   return { data: categoriesWithSpots, error: null };

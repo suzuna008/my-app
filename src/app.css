@@ -548,6 +548,26 @@ body {
     cursor: not-allowed;
 }
 
+.category-edit-btn {
+    background: none;
+    border: none;
+    color: #4285f4;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    transition: background 0.2s ease;
+    opacity: 0;
+}
+
+.category-header:hover .category-edit-btn {
+    opacity: 1;
+}
+
+.category-edit-btn:hover {
+    background: #e3f2fd;
+}
+
 .category-delete-btn {
     background: none;
     border: none;
@@ -565,6 +585,64 @@ body {
 }
 
 .category-delete-btn:hover {
+    background: #ffe0e0;
+}
+
+/* Category Edit Styles */
+.category-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.category-edit-input {
+    flex: 1;
+    padding: 0.375rem 0.75rem;
+    border: 2px solid #4285f4;
+    border-radius: 4px;
+    font-size: inherit;
+    font-weight: 500;
+    color: #333;
+    background: white;
+    outline: none;
+}
+
+.category-edit-input:focus {
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+}
+
+.category-save-btn,
+.category-cancel-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+}
+
+.category-save-btn {
+    color: #188038;
+}
+
+.category-save-btn:hover {
+    background: #e6f4ea;
+}
+
+.category-cancel-btn {
+    color: #dc3545;
+}
+
+.category-cancel-btn:hover {
     background: #ffe0e0;
 }
 
@@ -908,6 +986,234 @@ body {
     font-weight: bold;
 }
 
+/* Tag Filter Section */
+.tag-filter-section {
+    padding: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fa;
+}
+
+.tag-filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.tag-filter-header h3 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #5f6368;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.clear-filter-btn {
+    background: #ea4335;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+}
+
+.clear-filter-btn:hover {
+    background: #c5221f;
+}
+
+.tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.empty-tags {
+    color: #999;
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+.tag-chip {
+    background: white;
+    border: 1px solid #dadce0;
+    border-radius: 16px;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #5f6368;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.tag-chip:hover {
+    background: #f1f3f4;
+    border-color: #1a73e8;
+}
+
+.tag-chip.active {
+    background: #1a73e8;
+    color: white;
+    border-color: #1a73e8;
+}
+
+/* Spot Tags Display */
+.spot-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.75rem 1rem 0.75rem 2rem;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.15s;
+}
+
+.spot-item:hover {
+    background-color: #f8f9fa;
+}
+
+.spot-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.spot-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.spot-tag {
+    background: #e8f0fe;
+    color: #1967d2;
+    border-radius: 12px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.spot-actions {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    margin-left: 0.5rem;
+}
+
+.spot-tag-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.spot-tag-btn:hover {
+    opacity: 1;
+}
+
+/* Tag Management Modal */
+.tag-input-section {
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tag-input {
+    flex: 1;
+    padding: 0.625rem;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 0.9375rem;
+}
+
+.tag-input:focus {
+    outline: none;
+    border-color: #1a73e8;
+}
+
+.add-tag-btn {
+    padding: 0.625rem 1rem;
+    background: #1a73e8;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.add-tag-btn:hover {
+    background: #1765cc;
+}
+
+.current-tags-section {
+    margin-top: 1rem;
+}
+
+.current-tags-section h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #202124;
+}
+
+.tags-list-modal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tag-chip-modal {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #e8f0fe;
+    color: #1967d2;
+    border-radius: 16px;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.remove-tag-btn {
+    background: transparent;
+    border: none;
+    color: #1967d2;
+    cursor: pointer;
+    font-size: 1.125rem;
+    line-height: 1;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.remove-tag-btn:hover {
+    background: rgba(25, 103, 210, 0.1);
+}
+
+.no-tags {
+    color: #999;
+    font-size: 0.875rem;
+    font-style: italic;
+    margin: 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     body {
@@ -963,10 +1269,30 @@ body {
     
     .spot-item {
         padding: 0.625rem 0.75rem 0.625rem 1.5rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .spot-content {
+        width: 100%;
+    }
+    
+    .spot-actions {
+        margin-left: 0;
+        margin-top: 0.5rem;
     }
     
     .spot-name {
         font-size: 0.85rem;
+    }
+    
+    .tag-filter-section {
+        padding: 0.75rem;
+    }
+    
+    .tag-chip {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
     }
     
     .modal-content {
