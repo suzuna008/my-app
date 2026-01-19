@@ -40,6 +40,7 @@
     let currentSelectedPlace: SelectedPlace | null = null;
     let showPOIs = true;
     let infoWindow: any; // Shared InfoWindow instance
+    let userLocationMarker: any = null; // Marker for user's current location
     
     // UI state
     let searchQuery = '';
@@ -108,7 +109,7 @@
         placesService = new google.maps.places.PlacesService(map);
         autocompleteService = new google.maps.places.AutocompleteService();
 
-        // Try to get user's location
+        // Try to get user's location on init (without marker)
         navigator.geolocation?.getCurrentPosition(
             (pos) => {
                 map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
@@ -151,6 +152,79 @@
         map?.setOptions({ 
             styles: showPOIs ? [] : [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
         });
+    }
+
+    function showCurrentLocation() {
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const position = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                
+                // Remove existing user location marker if any
+                if (userLocationMarker) {
+                    userLocationMarker.setMap(null);
+                }
+
+                // Center map on user location
+                map.setCenter(position);
+                map.setZoom(16);
+
+                // Create and show marker for user location
+                userLocationMarker = new google.maps.Marker({
+                    position,
+                    map,
+                    title: 'Your Location',
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#4285f4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 3
+                    },
+                    animation: google.maps.Animation.DROP,
+                    zIndex: 1000 // Make sure it appears on top
+                });
+
+                // Show info window
+                if (infoWindow) {
+                    infoWindow.setContent(`
+                        <div style="padding: 12px; min-width: 200px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #202124;">📍 Your Location</h3>
+                            <div style="font-size: 13px; color: #70757a;">
+                                <div>Latitude: ${pos.coords.latitude.toFixed(6)}</div>
+                                <div>Longitude: ${pos.coords.longitude.toFixed(6)}</div>
+                            </div>
+                        </div>
+                    `);
+                    infoWindow.open(map, userLocationMarker);
+                }
+            },
+            (error) => {
+                let errorMessage = 'Unable to retrieve your location';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Location access denied. Please enable location permissions.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Location information unavailable.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Location request timed out.';
+                        break;
+                }
+                alert(errorMessage);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
     }
 
     // Search & Autocomplete
@@ -302,6 +376,7 @@
         markers.forEach(m => m.setMap(null));
         markers = [];
         currentSelectedPlace = null;
+        // Note: userLocationMarker is not cleared here - it persists until user clicks the button again
     }
 
     function updateMarkers() {
@@ -604,6 +679,9 @@
             <div id="map"></div>
             <button class="toggle-poi-btn" class:active={showPOIs} on:click={togglePOIs}>
                 📍 {showPOIs ? 'Hide' : 'Show'} Places
+            </button>
+            <button class="current-location-btn" on:click={showCurrentLocation} title="Show My Location">
+                📍
             </button>
             {#if currentSelectedPlace}
                 <button class="floating-save-btn show" on:click={() => spotModalOpen = true}>
