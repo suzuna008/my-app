@@ -15,6 +15,9 @@ import {
     type Spot as DbSpot
 } from '$lib/supabase';
 
+// Default category names
+const DEFAULT_CATEGORIES = ['Favourite', 'Blacklist'];
+
 // Core state
 export const categories = writable<Category[]>([]);
 export const loading = writable(false);
@@ -47,6 +50,37 @@ function dbSpotToLocal(spot: DbSpot): Spot {
     };
 }
 
+// Ensure default categories exist
+async function ensureDefaultCategories(existingCategories: Category[]) {
+    const existingNames = existingCategories.map(c => c.name.toLowerCase());
+    const newCategories: Category[] = [];
+    
+    for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
+        const defaultName = DEFAULT_CATEGORIES[i];
+        if (!existingNames.includes(defaultName.toLowerCase())) {
+            try {
+                const { data, error } = await createCategoryInDb(defaultName, i);
+                if (error) {
+                    console.error(`Error creating default category ${defaultName}:`, error);
+                } else if (data) {
+                    const newCategory = dbCategoryToLocal(data, []);
+                    newCategories.push(newCategory);
+                }
+            } catch (e) {
+                console.error(`Failed to create default category ${defaultName}:`, e);
+            }
+        }
+    }
+    
+    // Update store with new default categories if any were created
+    if (newCategories.length > 0) {
+        categories.update(cats => {
+            const updated = [...cats, ...newCategories];
+            return updated.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+        });
+    }
+}
+
 // Load all data from Supabase
 export async function loadCategories() {
     loading.set(true);
@@ -59,13 +93,18 @@ export async function loadCategories() {
     }
     
     if (data) {
-        categories.set(data.map(cat => ({
+        const loadedCategories = data.map(cat => ({
             id: cat.id,
             name: cat.name,
             expanded: cat.expanded,
             display_order: cat.display_order,
             spots: cat.spots.map((spot: any) => dbSpotToLocal(spot))
-        })));
+        }));
+        
+        categories.set(loadedCategories);
+        
+        // Ensure default categories exist after loading
+        await ensureDefaultCategories(loadedCategories);
     }
     
     loading.set(false);
