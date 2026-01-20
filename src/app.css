@@ -12,6 +12,20 @@ body {
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Allow text selection in input fields and text areas */
+input,
+textarea,
+[contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
 }
 
 .container {
@@ -545,6 +559,8 @@ body {
 .category-item[data-draggable] {
     cursor: grab;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .category-item[data-draggable]:active {
@@ -815,6 +831,8 @@ body {
     cursor: grab;
     touch-action: none;
     position: relative;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .spot-item[data-draggable]::before {
@@ -1261,6 +1279,8 @@ body {
     cursor: grab;
     touch-action: none;
     position: relative;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .tag-chip[data-draggable]:active {
@@ -1461,6 +1481,8 @@ body {
     cursor: grab;
     touch-action: none;
     position: relative;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .tag-chip-modal[data-draggable]:active {
