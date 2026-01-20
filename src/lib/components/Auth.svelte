@@ -80,14 +80,12 @@
 
   {#if $user}
     <div class="user-menu">
-      <button class="user-button" on:click|stopPropagation={toggleDropdown}>
+      <button class="user-button" on:click|stopPropagation={toggleDropdown} title={$profile?.full_name || $user.user_metadata?.full_name || $user.email}>
         {#if $profile?.avatar_url || $user.user_metadata?.avatar_url}
           <img class="user-avatar-img" src={$profile?.avatar_url || $user.user_metadata?.avatar_url} alt="Profile" />
         {:else}
           <span class="user-avatar">👤</span>
         {/if}
-        <span class="user-email">{$profile?.full_name || $user.user_metadata?.full_name || $user.email}</span>
-        <span class="dropdown-arrow">{showDropdown ? '▲' : '▼'}</span>
       </button>
       
       {#if showDropdown}
@@ -112,8 +110,8 @@
     </div>
   {:else}
     <div class="auth-form-container">
-      <button class="auth-toggle-btn" on:click|stopPropagation={() => showDropdown = !showDropdown}>
-        {showDropdown ? '✕ Close' : '🔐 Sign In'}
+      <button class="auth-toggle-btn" on:click|stopPropagation={() => showDropdown = !showDropdown} title="Sign In">
+        {showDropdown ? '✕' : '🔐'}
       </button>
       
       {#if showDropdown}
@@ -188,42 +186,37 @@
   .user-button {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: 0;
+    width: 40px;
+    height: 40px;
     background: #588157;
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 50%;
     cursor: pointer;
     font-size: 0.875rem;
-    transition: background 0.2s;
+    transition: all 0.2s;
+    overflow: hidden;
   }
 
   .user-button:hover {
     background: #4a6d4a;
+    box-shadow: 0 2px 8px rgba(88, 129, 87, 0.3);
   }
 
   .user-avatar {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .user-avatar-img {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-  }
-
-  .user-email {
-    max-width: 150px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .dropdown-arrow {
-    font-size: 0.6rem;
-    margin-left: 0.25rem;
   }
 
   .dropdown-menu {
@@ -301,18 +294,25 @@
   }
 
   .auth-toggle-btn {
-    padding: 0.5rem 1rem;
+    padding: 0;
+    width: 40px;
+    height: 40px;
     background: #588157;
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 0.875rem;
-    transition: background 0.2s;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
 
   .auth-toggle-btn:hover {
     background: #4a6d4a;
+    box-shadow: 0 2px 8px rgba(88, 129, 87, 0.3);
   }
 
   .auth-dropdown {
@@ -460,8 +460,15 @@
   }
 
   @media (max-width: 768px) {
-    .user-email {
-      display: none;
+    .user-button,
+    .auth-toggle-btn {
+      width: 36px;
+      height: 36px;
+      font-size: 1rem;
+    }
+    
+    .user-avatar {
+      font-size: 1rem;
     }
 
     .auth-dropdown {
