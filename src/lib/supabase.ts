@@ -38,6 +38,33 @@ export interface Tag {
   updated_at: string;
 }
 
+export interface Profile {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  first_name: string | null; // From Google OAuth (given_name)
+  last_name: string | null; // From Google OAuth (family_name)
+  avatar_url: string | null;
+  bio: string | null;
+  phone: string | null;
+  location: string | null;
+  date_of_birth: string | null;
+  website: string | null;
+  // Auto-collectible fields
+  locale: string | null; // From Google OAuth or browser
+  timezone: string | null; // From browser
+  language: string | null; // From browser navigator.language
+  user_agent: string | null; // Browser/device info
+  last_login_at: string | null; // Track login times
+  last_activity_at: string | null; // Track last app interaction
+  email_confirmed_at: string | null; // From auth.users
+  account_created_at: string | null; // From auth.users.created_at
+  sign_in_count: number | null; // Count logins
+  provider: string | null; // 'google', 'email', etc.
+  created_at: string;
+  updated_at: string;
+}
+
 // Auth helpers
 export async function signUp(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({ email, password });
@@ -67,6 +94,59 @@ export async function signOut() {
 export async function getUser() {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
+}
+
+// Profile operations
+export async function getProfile(userId?: string) {
+  const user = await getUser();
+  if (!user) return { data: null, error: new Error('Not authenticated') };
+  
+  const targetUserId = userId || user.id;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', targetUserId)
+    .single();
+  return { data, error };
+}
+
+export async function updateProfile(updates: Partial<Profile>) {
+  const user = await getUser();
+  if (!user) return { data: null, error: new Error('Not authenticated') };
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', user.id)
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function upsertProfile(profile: Partial<Profile>) {
+  const user = await getUser();
+  if (!user) return { data: null, error: new Error('Not authenticated') };
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({ id: user.id, ...profile })
+    .select()
+    .single();
+  return { data, error };
+}
+
+// Track user activity (call this periodically or on key interactions)
+export async function updateLastActivity() {
+  const user = await getUser();
+  if (!user) return { data: null, error: new Error('Not authenticated') };
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ last_activity_at: new Date().toISOString() })
+    .eq('id', user.id)
+    .select()
+    .single();
+  return { data, error };
 }
 
 // Category operations

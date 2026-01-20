@@ -1,6 +1,6 @@
 <script lang="ts">
   import { signIn, signUp, signOut, signInWithGoogle } from '$lib/supabase';
-  import { user } from '$lib/stores/auth';
+  import { user, profile } from '$lib/stores/auth';
   import { supabase } from '$lib/supabase'
 
   let email = '';
@@ -81,22 +81,28 @@
   {#if $user}
     <div class="user-menu">
       <button class="user-button" on:click|stopPropagation={toggleDropdown}>
-        {#if $user.user_metadata?.avatar_url}
-          <img class="user-avatar-img" src={$user.user_metadata.avatar_url} alt="Profile" />
+        {#if $profile?.avatar_url || $user.user_metadata?.avatar_url}
+          <img class="user-avatar-img" src={$profile?.avatar_url || $user.user_metadata?.avatar_url} alt="Profile" />
         {:else}
           <span class="user-avatar">👤</span>
         {/if}
-        <span class="user-email">{$user.user_metadata?.full_name || $user.email}</span>
+        <span class="user-email">{$profile?.full_name || $user.user_metadata?.full_name || $user.email}</span>
         <span class="dropdown-arrow">{showDropdown ? '▲' : '▼'}</span>
       </button>
       
       {#if showDropdown}
         <div class="dropdown-menu">
           <div class="dropdown-header">
-            {#if $user.user_metadata?.full_name}
-              <span class="dropdown-name">{$user.user_metadata.full_name}</span>
+            {#if $profile?.full_name || $user.user_metadata?.full_name}
+              <span class="dropdown-name">{$profile?.full_name || $user.user_metadata?.full_name}</span>
             {/if}
-            <span class="dropdown-email">{$user.email}</span>
+            <span class="dropdown-email">{$profile?.email || $user.email}</span>
+            {#if $profile?.bio}
+              <span class="dropdown-bio">{$profile.bio}</span>
+            {/if}
+            {#if $profile?.location}
+              <span class="dropdown-location">📍 {$profile.location}</span>
+            {/if}
           </div>
           <button class="dropdown-item sign-out" on:click={handleSignOut}>
             <span>🚪</span> Sign Out
@@ -250,6 +256,21 @@
     font-size: 0.875rem;
     color: #666;
     word-break: break-all;
+  }
+
+  .dropdown-bio {
+    display: block;
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.5rem;
+    line-height: 1.4;
+  }
+
+  .dropdown-location {
+    display: block;
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.25rem;
   }
 
   .dropdown-item {
