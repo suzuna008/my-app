@@ -37,7 +37,10 @@
         getPlaceDetailsById,
         getAutocompleteSuggestions,
         textSearch,
-        isAddressPattern
+        isAddressPattern,
+        getNearbyPlaceTypes,
+        searchNearbyByType,
+        getDistance
     } from '$lib/utils/places';
     import type { SelectedPlace, PlaceDetails, Spot } from '$lib/types';
     import Auth from '$lib/components/Auth.svelte';
@@ -67,6 +70,12 @@
     let tagInputValue = '';
     let editingCategoryId: string | null = null;
     let editingCategoryName = '';
+    
+    // Map-based categories (from nearby places)
+    let mapCategories: Array<{ type: string; name: string; count: number }> = [];
+    let loadingMapCategories = false;
+    let selectedMapCategory: string | null = null;
+    let mapCategoryMarkers: any[] = [];
 
     // Auth subscription
     const unsubUser = user.subscribe(async (u) => {
@@ -133,9 +142,26 @@
             (pos) => {
                 map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                 map.setZoom(14);
+                loadMapCategories(pos.coords.latitude, pos.coords.longitude);
             },
-            () => console.log('Geolocation unavailable')
+            () => {
+                console.log('Geolocation unavailable');
+                // Load categories for default location
+                loadMapCategories(37.7749, -122.4194);
+            }
         );
+        
+        // Load categories when map moves (debounced)
+        let mapMoveTimeout: any;
+        map.addListener('bounds_changed', () => {
+            clearTimeout(mapMoveTimeout);
+            mapMoveTimeout = setTimeout(() => {
+                const center = map.getCenter();
+                if (center) {
+                    loadMapCategories(center.lat(), center.lng());
+                }
+            }, 1000);
+        });
 
         // Map click handler
         map.addListener('click', (e: any) => {
@@ -396,6 +422,9 @@
         markers = [];
         currentSelectedPlace = null;
         // Note: userLocationMarker is not cleared here - it persists until user clicks the button again
+        // Also clear map category markers when clearing search markers
+        clearMapCategoryMarkers();
+        selectedMapCategory = null;
     }
 
     function updateMarkers() {
@@ -695,10 +724,10 @@
 
         try {
             const tagName = tagInputValue.trim();
+            const spot = selectedSpotForTags; // Store reference
             
             // Check if tag already exists on this spot
-            if (!selectedSpotForTags) return;
-            const existingTags = selectedSpotForTags.tags || [];
+            const existingTags = spot.tags || [];
             if (existingTags.some((t: { name: string }) => t.name.toLowerCase() === tagName.toLowerCase())) {
                 // Tag already exists, just clear the input
                 tagInputValue = '';
@@ -708,13 +737,13 @@
             // Create tag if it doesn't exist, or get existing tag
             const newTag = await addTag(tagName);
             // Add tag to spot
-            await addTagToSpot(selectedSpotForTags.id, newTag.id);
+            await addTagToSpot(spot.id, newTag.id);
             tagInputValue = '';
             
             // Update selectedSpotForTags to reflect the new tag
             const updatedCategories = get(categories);
             for (const cat of updatedCategories) {
-                const updatedSpot = cat.spots.find((s: Spot) => s.id === selectedSpotForTags.id);
+                const updatedSpot = cat.spots.find((s: Spot) => s.id === spot.id);
                 if (updatedSpot) {
                     selectedSpotForTags = updatedSpot;
                     break;
@@ -757,6 +786,116 @@
 
     function handleTagFilter(tagId: string | null) {
         setTagFilter(tagId);
+    }
+
+    // Load map-based categories from nearby places
+    async function loadMapCategories(lat: number, lng: number) {
+        if (!placesService || loadingMapCategories) return;
+        
+        loadingMapCategories = true;
+        try {
+            // Calculate radius based on zoom level
+            const bounds = map.getBounds();
+            if (bounds) {
+                const ne = bounds.getNorthEast();
+                const sw = bounds.getSouthWest();
+                const radius = Math.max(
+                    getDistance(lat, lng, ne.lat(), ne.lng()) * 1000,
+                    getDistance(lat, lng, sw.lat(), sw.lng()) * 1000
+                );
+                
+                const categories = await getNearbyPlaceTypes(placesService, lat, lng, Math.min(radius, 2000));
+                mapCategories = categories;
+            }
+        } catch (e) {
+            console.error('Error loading map categories:', e);
+        } finally {
+            loadingMapCategories = false;
+        }
+    }
+
+    // Show/hide markers for selected map category
+    async function toggleMapCategory(categoryType: string) {
+        if (selectedMapCategory === categoryType) {
+            // Deselect - clear markers
+            selectedMapCategory = null;
+            clearMapCategoryMarkers();
+        } else {
+            // Select new category
+            selectedMapCategory = categoryType;
+            await showMapCategoryMarkers(categoryType);
+        }
+    }
+
+    async function showMapCategoryMarkers(categoryType: string) {
+        // Clear existing category markers
+        clearMapCategoryMarkers();
+        
+        if (!placesService || !map) return;
+        
+        const center = map.getCenter();
+        if (!center) return;
+        
+        const bounds = map.getBounds();
+        let radius = 1000;
+        if (bounds) {
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            radius = Math.max(
+                getDistance(center.lat(), center.lng(), ne.lat(), ne.lng()) * 1000,
+                getDistance(center.lat(), center.lng(), sw.lat(), sw.lng()) * 1000
+            );
+        }
+        
+        try {
+            const places = await searchNearbyByType(
+                placesService,
+                center.lat(),
+                center.lng(),
+                categoryType,
+                Math.min(radius, 2000)
+            );
+            
+            places.forEach((place: any) => {
+                if (place.geometry && place.geometry.location) {
+                    const marker = new google.maps.Marker({
+                        position: {
+                            lat: place.geometry.location.lat(),
+                            lng: place.geometry.location.lng()
+                        },
+                        map,
+                        title: place.name,
+                        icon: {
+                            url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                        }
+                    });
+                    
+                    marker.addListener('click', async () => {
+                        const details = await getPlaceDetailsById(placesService, place.place_id);
+                        if (infoWindow) {
+                            const content = buildInfoWindowContent({
+                                name: place.name,
+                                address: place.vicinity || '',
+                                lat: place.geometry.location.lat(),
+                                lng: place.geometry.location.lng(),
+                                placeId: place.place_id
+                            }, '', details, true);
+                            infoWindow.setContent(content);
+                            infoWindow.open(map, marker);
+                        }
+                    });
+                    
+                    mapCategoryMarkers.push(marker);
+                }
+            });
+        } catch (e) {
+            console.error('Error showing map category markers:', e);
+        }
+    }
+
+    function clearMapCategoryMarkers() {
+        mapCategoryMarkers.forEach(m => m.setMap(null));
+        mapCategoryMarkers = [];
     }
 </script>
 
@@ -804,6 +943,52 @@
         </div>
     </header>
 
+    <!-- Top Category Section (Map-based categories) -->
+    <div class="top-categories-section">
+        <div class="top-categories-scroll">
+            {#if loadingMapCategories}
+                <div class="top-category-loading">Loading nearby places...</div>
+            {:else if mapCategories.length === 0}
+                <div class="top-category-empty">No nearby places found</div>
+            {:else}
+                {#each mapCategories as category}
+                    <button 
+                        type="button"
+                        class="top-category-btn"
+                        class:active={selectedMapCategory === category.type}
+                        on:click={() => toggleMapCategory(category.type)}
+                    >
+                        <span class="top-category-icon">
+                            {#if category.type === 'restaurant'}🍽️
+                            {:else if category.type === 'cafe'}☕
+                            {:else if category.type === 'park'}🌳
+                            {:else if category.type === 'bar'}🍺
+                            {:else if category.type === 'lodging'}🏨
+                            {:else if category.type === 'museum'}🏛️
+                            {:else if category.type === 'shopping_mall' || category.type === 'store'}🛍️
+                            {:else if category.type === 'gas_station'}⛽
+                            {:else if category.type === 'hospital'}🏥
+                            {:else if category.type === 'school'}🏫
+                            {:else if category.type === 'church'}⛪
+                            {:else if category.type === 'tourist_attraction'}🗺️
+                            {:else if category.type === 'gym'}💪
+                            {:else if category.type === 'pharmacy'}💊
+                            {:else if category.type === 'bank'}🏦
+                            {:else if category.type === 'movie_theater'}🎬
+                            {:else if category.type === 'night_club'}🎉
+                            {:else if category.type === 'spa'}🧖
+                            {:else if category.type === 'library'}📚
+                            {:else}📍
+                            {/if}
+                        </span>
+                        <span class="top-category-name">{category.name}</span>
+                        <span class="top-category-count">{category.count}</span>
+                    </button>
+                {/each}
+            {/if}
+        </div>
+    </div>
+
     <div class="main-content">
         <div class="map-container">
             <div id="map"></div>
@@ -823,8 +1008,8 @@
 
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>Categories</h2>
-                <button class="add-btn" on:click={() => categoryModalOpen = true} title="Add Category">+</button>
+                <h2>My Lists</h2>
+                <button class="add-btn" on:click={() => categoryModalOpen = true} title="Add List">+</button>
             </div>
             
             <!-- Tag Filter Section -->
@@ -868,13 +1053,13 @@
                         {#if $selectedTagFilter}
                             <p>No spots match this tag</p>
                         {:else}
-                            <p>No categories yet</p>
+                            <p>No lists yet</p>
                             <p>Click + to create one</p>
                         {/if}
                     </div>
                 {:else}
                     {#each displayCategories as category (category.id)}
-                        <div class="category-item" class:expanded={category.expanded}>
+                        <div class="category-item" class:expanded={category.expanded} data-category-id={category.id}>
                             <div class="category-header">
                                 {#if editingCategoryId === category.id}
                                     <div class="category-edit-container">
@@ -982,12 +1167,12 @@
         <div class="modal" style="display: block" on:click|self={() => categoryModalOpen = false}>
             <div class="modal-content">
                 <button type="button" class="close" on:click={() => categoryModalOpen = false}>&times;</button>
-                <h3>Create New Category</h3>
+                <h3>Create New List</h3>
                 <input 
                     type="text" 
                     bind:value={newCategoryName}
                     on:keydown={(e) => e.key === 'Enter' && handleCreateCategory()}
-                    placeholder="Category name (e.g., Cafe, Restaurant)"
+                    placeholder="List name (e.g., Favourite Places, Coffee Shops)"
                     id="category-name-input"
                 >
                 <button class="create-btn" on:click={handleCreateCategory}>Create</button>

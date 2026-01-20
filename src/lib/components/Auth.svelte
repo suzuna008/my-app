@@ -190,7 +190,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    background: #4285f4;
+    background: #588157;
     color: white;
     border: none;
     border-radius: 8px;
@@ -200,7 +200,7 @@
   }
 
   .user-button:hover {
-    background: #3367d6;
+    background: #4a6d4a;
   }
 
   .user-avatar {
@@ -230,9 +230,10 @@
     position: absolute;
     top: calc(100% + 0.5rem);
     right: 0;
-    background: white;
+    background: #F9F7F2;
     border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(52, 78, 65, 0.15);
+    border: 1px solid #A3B18A;
     min-width: 200px;
     z-index: 1000;
     overflow: hidden;
@@ -240,28 +241,28 @@
 
   .dropdown-header {
     padding: 1rem;
-    background: #f8f9fa;
-    border-bottom: 1px solid #e0e0e0;
+    background: rgba(163, 177, 138, 0.1);
+    border-bottom: 1px solid #A3B18A;
   }
 
   .dropdown-name {
     display: block;
     font-size: 0.9rem;
     font-weight: 500;
-    color: #333;
+    color: #344E41;
     margin-bottom: 0.25rem;
   }
 
   .dropdown-email {
     font-size: 0.875rem;
-    color: #666;
+    color: #588157;
     word-break: break-all;
   }
 
   .dropdown-bio {
     display: block;
     font-size: 0.8rem;
-    color: #666;
+    color: #588157;
     margin-top: 0.5rem;
     line-height: 1.4;
   }
@@ -269,7 +270,7 @@
   .dropdown-location {
     display: block;
     font-size: 0.8rem;
-    color: #666;
+    color: #588157;
     margin-top: 0.25rem;
   }
 
@@ -288,11 +289,11 @@
   }
 
   .dropdown-item:hover {
-    background: #f0f0f0;
+    background: rgba(163, 177, 138, 0.2);
   }
 
   .dropdown-item.sign-out {
-    color: #dc3545;
+    color: #588157;
   }
 
   .auth-form-container {
@@ -301,7 +302,7 @@
 
   .auth-toggle-btn {
     padding: 0.5rem 1rem;
-    background: #4285f4;
+    background: #588157;
     color: white;
     border: none;
     border-radius: 8px;
@@ -311,16 +312,17 @@
   }
 
   .auth-toggle-btn:hover {
-    background: #3367d6;
+    background: #4a6d4a;
   }
 
   .auth-dropdown {
     position: absolute;
     top: calc(100% + 0.5rem);
     right: 0;
-    background: white;
+    background: #F9F7F2;
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(52, 78, 65, 0.15);
+    border: 1px solid #A3B18A;
     padding: 1.5rem;
     min-width: 280px;
     z-index: 1000;
@@ -329,7 +331,7 @@
   .auth-dropdown h3 {
     margin: 0 0 1rem 0;
     font-size: 1.25rem;
-    color: #333;
+    color: #344E41;
   }
 
   .google-btn {
@@ -339,9 +341,9 @@
     gap: 0.75rem;
     width: 100%;
     padding: 0.75rem 1rem;
-    background: white;
-    color: #333;
-    border: 1px solid #ddd;
+    background: #F9F7F2;
+    color: #344E41;
+    border: 1px solid #A3B18A;
     border-radius: 8px;
     cursor: pointer;
     font-size: 0.875rem;
@@ -350,9 +352,10 @@
   }
 
   .google-btn:hover:not(:disabled) {
-    background: #f8f9fa;
-    border-color: #ccc;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: #A3B18A;
+    border-color: #588157;
+    box-shadow: 0 1px 3px rgba(88, 129, 87, 0.1);
+    color: #344E41;
   }
 
   .google-btn:disabled {
@@ -375,12 +378,12 @@
     content: '';
     flex: 1;
     height: 1px;
-    background: #ddd;
+    background: #A3B18A;
   }
 
   .divider span {
     padding: 0 0.75rem;
-    color: #999;
+    color: #A3B18A;
     font-size: 0.75rem;
     text-transform: uppercase;
   }
@@ -393,29 +396,31 @@
 
   .auth-dropdown input {
     padding: 0.75rem 1rem;
-    border: 1px solid #ddd;
+    border: 1px solid #A3B18A;
     border-radius: 8px;
     font-size: 0.875rem;
+    background: #F9F7F2;
+    color: #344E41;
     transition: border-color 0.2s;
   }
 
   .auth-dropdown input:focus {
     outline: none;
-    border-color: #4285f4;
+    border-color: #588157;
   }
 
   .error {
-    color: #dc3545;
+    color: #588157;
     font-size: 0.875rem;
     margin: 0;
     padding: 0.5rem;
-    background: #fff5f5;
+    background: rgba(88, 129, 87, 0.1);
     border-radius: 4px;
   }
 
   .submit-btn {
     padding: 0.75rem 1rem;
-    background: #4285f4;
+    background: #588157;
     color: white;
     border: none;
     border-radius: 8px;
@@ -426,7 +431,7 @@
   }
 
   .submit-btn:hover:not(:disabled) {
-    background: #3367d6;
+    background: #4a6d4a;
   }
 
   .submit-btn:disabled {
@@ -437,21 +442,21 @@
   .switch-mode {
     margin: 1rem 0 0 0;
     font-size: 0.875rem;
-    color: #666;
+    color: #588157;
     text-align: center;
   }
 
   .link-btn {
     background: none;
     border: none;
-    color: #4285f4;
+    color: #588157;
     cursor: pointer;
     font-size: 0.875rem;
     text-decoration: underline;
   }
 
   .link-btn:hover {
-    color: #3367d6;
+    color: #344E41;
   }
 
   @media (max-width: 768px) {

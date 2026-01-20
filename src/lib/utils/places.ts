@@ -156,6 +156,111 @@ export function searchNearby(
     });
 }
 
+// Search for nearby places by type
+export function searchNearbyByType(
+    placesService: any,
+    lat: number,
+    lng: number,
+    type: string,
+    radius: number = 1000
+): Promise<any[]> {
+    return new Promise((resolve) => {
+        if (!placesService) {
+            resolve([]);
+            return;
+        }
+        
+        placesService.nearbySearch({
+            location: new google.maps.LatLng(lat, lng),
+            radius,
+            type: type
+        }, (results: any[], status: any) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                resolve(results);
+            } else {
+                resolve([]);
+            }
+        });
+    });
+}
+
+// Get nearby place types grouped by category
+export async function getNearbyPlaceTypes(
+    placesService: any,
+    lat: number,
+    lng: number,
+    radius: number = 1000
+): Promise<Array<{ type: string; name: string; count: number }>> {
+    if (!placesService) return [];
+    
+    const commonTypes = [
+        'restaurant',
+        'cafe',
+        'park',
+        'bar',
+        'lodging',
+        'museum',
+        'shopping_mall',
+        'store',
+        'gas_station',
+        'hospital',
+        'school',
+        'church',
+        'tourist_attraction',
+        'gym',
+        'pharmacy',
+        'bank',
+        'movie_theater',
+        'night_club',
+        'spa',
+        'library'
+    ];
+    
+    const typeMap: Record<string, string> = {
+        restaurant: 'Restaurants',
+        cafe: 'Coffee Shops',
+        bar: 'Bars',
+        lodging: 'Hotels',
+        park: 'Parks',
+        museum: 'Museums',
+        shopping_mall: 'Shopping',
+        store: 'Stores',
+        gas_station: 'Gas Stations',
+        hospital: 'Hospitals',
+        school: 'Schools',
+        church: 'Churches',
+        tourist_attraction: 'Attractions',
+        gym: 'Gyms',
+        pharmacy: 'Pharmacies',
+        bank: 'Banks',
+        movie_theater: 'Cinemas',
+        night_club: 'Nightlife',
+        spa: 'Spas',
+        library: 'Libraries'
+    };
+    
+    const results = await Promise.all(
+        commonTypes.map(async (type) => {
+            try {
+                const places = await searchNearbyByType(placesService, lat, lng, type, radius);
+                return {
+                    type,
+                    name: typeMap[type] || type,
+                    count: places.length
+                };
+            } catch (e) {
+                return { type, name: typeMap[type] || type, count: 0 };
+            }
+        })
+    );
+    
+    // Filter out types with 0 results and sort by count (descending)
+    return results
+        .filter(r => r.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // Limit to top 10 categories
+}
+
 // Text search for places
 export function textSearch(
     placesService: any,
