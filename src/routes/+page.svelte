@@ -135,7 +135,24 @@
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
-            clickableIcons: false
+            zoomControl: false,
+            panControl: false,
+            rotateControl: false,
+            scaleControl: false,
+            clickableIcons: false,
+            disableDefaultUI: true
+        });
+
+        // Force remove any remaining controls
+        map.setOptions({
+            disableDefaultUI: true,
+            zoomControl: false,
+            panControl: false,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            rotateControl: false,
+            scaleControl: false
         });
 
         placesService = new google.maps.places.PlacesService(map);
