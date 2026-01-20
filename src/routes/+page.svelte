@@ -131,7 +131,8 @@
         map = new google.maps.Map(mapEl, {
             center: { lat: 37.7749, lng: -122.4194 },
             zoom: 13,
-            styles: showPOIs ? [] : [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
+            styles: showPOIs ? [] : [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
+            mapTypeControl: false
         });
 
         placesService = new google.maps.places.PlacesService(map);
