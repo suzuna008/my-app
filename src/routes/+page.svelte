@@ -31,6 +31,7 @@
         removeTagFromSpot,
         setTagFilter
     } from '$lib/stores/spots';
+    import { dragDrop } from '$lib/utils/dnd';
     import { 
         escapeHtml, 
         formatPlaceType, 
@@ -853,6 +854,98 @@
         }
     }
 
+    // Drag and drop handlers
+    async function handleCategoryReorder(fromIndex: number, toIndex: number) {
+        // Don't allow reordering when tag filter is active
+        if ($selectedTagFilter.length > 0) return;
+        
+        const currentCategories = get(categories);
+        if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || 
+            fromIndex >= currentCategories.length || toIndex >= currentCategories.length) {
+            return;
+        }
+        
+        const reordered = [...currentCategories];
+        const [moved] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, moved);
+        
+        // Update display_order for all affected categories
+        const updates = reordered.map((cat, index) => ({
+            id: cat.id,
+            order: index
+        }));
+        
+        // Update all categories in parallel
+        await Promise.all(updates.map(({ id, order }) => updateCategoryOrder(id, order)));
+        
+        // Update local state
+        categories.set(reordered.map((cat, index) => ({ ...cat, display_order: index })));
+    }
+
+    async function handleSpotReorder(categoryId: string, fromIndex: number, toIndex: number) {
+        const currentCategories = get(categories);
+        const category = currentCategories.find(c => c.id === categoryId);
+        if (!category || fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
+            fromIndex >= category.spots.length || toIndex >= category.spots.length) {
+            return;
+        }
+        
+        const reordered = [...category.spots];
+        const [moved] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, moved);
+        
+        // Update display_order for all affected spots
+        const updates = reordered.map((spot, index) => ({
+            id: spot.id,
+            order: index
+        }));
+        
+        // Update all spots in parallel
+        await Promise.all(updates.map(({ id, order }) => updateSpotOrder(id, order)));
+        
+        // Update local state
+        categories.update(cats => cats.map(c => 
+            c.id === categoryId 
+                ? { ...c, spots: reordered.map((spot, index) => ({ ...spot, display_order: index })) }
+                : c
+        ));
+    }
+
+    async function handleTagReorder(fromIndex: number, toIndex: number) {
+        const currentTags = get(tags);
+        if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
+            fromIndex >= currentTags.length || toIndex >= currentTags.length) {
+            return;
+        }
+        
+        const reordered = [...currentTags];
+        const [moved] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, moved);
+        
+        // For now, just update local state (tags don't have display_order in DB yet)
+        // TODO: Add display_order to tags table and persist order
+        tags.set(reordered);
+    }
+
+    async function handleTagModalReorder(fromIndex: number, toIndex: number) {
+        if (!selectedSpotForTags) return;
+        
+        const currentTags = selectedSpotForTags.tags || [];
+        if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
+            fromIndex >= currentTags.length || toIndex >= currentTags.length) {
+            return;
+        }
+        
+        const reordered = [...currentTags];
+        const [moved] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, moved);
+        
+        // Update selectedSpotForTags
+        selectedSpotForTags = { ...selectedSpotForTags, tags: reordered };
+        
+        // Note: Tag order on spots is not persisted in DB, this is just visual reordering
+    }
+
     // Load map-based categories from nearby places
     async function loadMapCategories(lat: number, lng: number) {
         if (!placesService || loadingMapCategories) return;
@@ -1092,7 +1185,7 @@
                         </button>
                     {/if}
                 </div>
-                <div class="tags-list">
+                <div class="tags-list" use:dragDrop={{ onDrop: handleTagReorder }}>
                     {#if $tags.length === 0}
                         <div class="empty-tags">No tags yet</div>
                     {:else}
@@ -1102,6 +1195,7 @@
                                 class="tag-chip"
                                 class:active={$selectedTagFilter.includes(tag.id)}
                                 on:click={() => handleTagFilter(tag.id)}
+                                data-draggable
                             >
                                 {#if $selectedTagFilter.includes(tag.id)}
                                     <span class="tag-checkmark">✓</span>
@@ -1113,7 +1207,7 @@
                 </div>
             </div>
             
-            <div class="categories-list">
+            <div class="categories-list" use:dragDrop={{ onDrop: handleCategoryReorder, disabled: $selectedTagFilter.length > 0 }}>
                 {#if $loading}
                     <div class="empty-state">Loading...</div>
                 {:else if displayCategories.length === 0}
@@ -1127,7 +1221,7 @@
                     </div>
                 {:else}
                     {#each displayCategories as category (category.id)}
-                        <div class="category-item" class:expanded={category.expanded} data-category-id={category.id}>
+                        <div class="category-item" class:expanded={category.expanded} data-category-id={category.id} data-draggable>
                             <div class="category-header">
                                 {#if editingCategoryId === category.id}
                                     <div class="category-edit-container">
@@ -1181,14 +1275,14 @@
                                     >🗑️</button>
                                 {/if}
                             </div>
-                            <div class="spots-list">
+                            <div class="spots-list" use:dragDrop={{ onDrop: (from, to) => handleSpotReorder(category.id, from, to) }}>
                                 {#if category.spots.length === 0}
                                     <div style="padding: 0.75rem 1rem 0.75rem 2rem; color: #999; font-size: 0.875rem;">
                                         No spots saved yet
                                     </div>
                                 {:else}
                                     {#each category.spots as spot (spot.id)}
-                                        <div class="spot-item">
+                                        <div class="spot-item" data-draggable>
                                             <div class="spot-content">
                                                 <button 
                                                     type="button"
@@ -1324,9 +1418,9 @@
                 <div class="current-tags-section">
                     <h4>Current Tags:</h4>
                     {#if selectedSpotForTags.tags && selectedSpotForTags.tags.length > 0}
-                        <div class="tags-list-modal">
+                        <div class="tags-list-modal" use:dragDrop={{ onDrop: handleTagModalReorder }}>
                             {#each selectedSpotForTags.tags as tag}
-                                <div class="tag-chip-modal">
+                                <div class="tag-chip-modal" data-draggable>
                                     <span>{tag.name}</span>
                                     <button 
                                         type="button"
