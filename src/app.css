@@ -32,7 +32,8 @@ body {
 @media (max-width: 768px) {
     .header {
         padding: 0.75rem 1rem;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
     }
 }
 
@@ -40,6 +41,7 @@ body {
     flex: 1;
     max-width: 100%;
     position: relative;
+    min-width: 0;
 }
 
 .auth-wrapper {
@@ -48,11 +50,11 @@ body {
 
 @media (max-width: 768px) {
     .auth-wrapper {
-        order: -1;
-        width: 100%;
+        order: 0;
+        width: auto;
         display: flex;
         justify-content: flex-end;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0;
     }
 }
 
@@ -65,6 +67,8 @@ body {
     padding: 0.75rem 1rem;
     border: 2px solid #A3B18A;
     transition: all 0.3s ease;
+    min-width: 0;
+    flex: 1;
 }
 
 .search-box:focus-within {
@@ -85,6 +89,7 @@ body {
     font-size: 1rem;
     outline: none;
     color: #344E41;
+    min-width: 0;
 }
 
 .search-box input::placeholder {
@@ -101,11 +106,12 @@ body {
     font-weight: 500;
     transition: background 0.2s ease;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
     .search-btn {
-        padding: 0.5rem 1rem;
+        padding: 0.5rem 0.75rem;
         font-size: 0.875rem;
     }
 }
@@ -787,16 +793,19 @@ body {
     cursor: pointer;
     padding: 0;
     text-align: left;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.spot-name-btn::before {
+    content: "-";
+    color: #A3B18A;
+    flex-shrink: 0;
 }
 
 .spot-name-btn:hover {
     color: #344E41;
-}
-
-.spot-item::before {
-    content: "-";
-    margin-right: 0.5rem;
-    color: #A3B18A;
 }
 
 .spot-item.dragging {
@@ -1134,6 +1143,9 @@ body {
 }
 
 .tag-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
     background: #F9F7F2;
     border: 1px solid #A3B18A;
     border-radius: 16px;
@@ -1152,9 +1164,27 @@ body {
 }
 
 .tag-chip.active {
+    background: rgba(163, 177, 138, 0.3);
+    border-color: #588157;
+    color: #344E41;
+}
+
+.tag-checkmark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
     background: #588157;
     color: white;
-    border-color: #588157;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.tag-name {
+    flex: 1;
 }
 
 /* Spot Tags Display */
@@ -1174,6 +1204,9 @@ body {
 .spot-content {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .spot-tags {
@@ -1215,9 +1248,21 @@ body {
 }
 
 /* Tag Management Modal */
+.available-tags-section {
+    margin-bottom: 1.5rem;
+}
+
+.available-tags-section h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #344E41;
+}
+
 .tag-input-section {
     margin-bottom: 1.5rem;
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
 }
 
@@ -1241,15 +1286,18 @@ body {
     background: #588157;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 0.9375rem;
     font-weight: 500;
-    transition: background 0.2s;
+    transition: all 0.2s;
+    align-self: flex-start;
 }
 
 .add-tag-btn:hover {
     background: #4a6d4a;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(88, 129, 87, 0.3);
 }
 
 .current-tags-section {
@@ -1279,6 +1327,36 @@ body {
     padding: 0.375rem 0.75rem;
     font-size: 0.8125rem;
     font-weight: 500;
+}
+
+.tag-chip-available {
+    display: inline-flex;
+    align-items: center;
+    background: #F9F7F2;
+    border: 1px solid #A3B18A;
+    border-radius: 16px;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #344E41;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.tag-chip-available:hover {
+    background: #588157;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(88, 129, 87, 0.3);
+}
+
+.no-matching-tags {
+    color: #A3B18A;
+    font-size: 0.875rem;
+    font-style: italic;
+    margin: 0.5rem 0 0 0;
+    padding: 0.5rem;
 }
 
 .remove-tag-btn {
@@ -1381,22 +1459,34 @@ body {
     }
     
     .spot-item {
-        padding: 0.625rem 0.75rem 0.625rem 1.5rem;
-        flex-direction: column;
+        padding: 0.625rem 0.75rem 0.625rem 1rem;
+        flex-direction: row;
         align-items: flex-start;
+        gap: 0.5rem;
     }
     
     .spot-content {
         width: 100%;
+        flex: 1;
+        min-width: 0;
     }
     
     .spot-actions {
         margin-left: 0;
-        margin-top: 0.5rem;
+        margin-top: 0;
+        flex-shrink: 0;
     }
     
-    .spot-name {
+    .spot-name,
+    .spot-name-btn {
         font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .spot-name-btn::before {
+        margin-right: 0.25rem;
     }
     
     .tag-filter-section {

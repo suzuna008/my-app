@@ -27,25 +27,25 @@ const DEFAULT_CATEGORIES = ['Favourite', 'Blacklist'];
 export const categories = writable<Category[]>([]);
 export const loading = writable(false);
 export const tags = writable<Tag[]>([]);
-export const selectedTagFilter = writable<string | null>(null);
+export const selectedTagFilter = writable<string[]>([]);
 
 // Derived state
 export const totalSpots = derived(categories, $categories => 
     $categories.reduce((sum, cat) => sum + cat.spots.length, 0)
 );
 
-// Filtered categories based on selected tag
+// Filtered categories based on selected tags (multiple selection)
 export const filteredCategories = derived(
     [categories, selectedTagFilter],
     ([$categories, $selectedTagFilter]) => {
-        if (!$selectedTagFilter) {
+        if (!$selectedTagFilter || $selectedTagFilter.length === 0) {
             return $categories;
         }
         
         return $categories.map(cat => ({
             ...cat,
             spots: cat.spots.filter(spot => 
-                spot.tags?.some(tag => tag.id === $selectedTagFilter)
+                spot.tags?.some(tag => $selectedTagFilter.includes(tag.id))
             )
         })).filter(cat => cat.spots.length > 0);
     }
@@ -155,7 +155,7 @@ export async function loadTags() {
 export function clearCategories() {
     categories.set([]);
     tags.set([]);
-    selectedTagFilter.set(null);
+    selectedTagFilter.set([]);
 }
 
 // Category operations
@@ -300,10 +300,10 @@ export async function removeTag(id: string) {
     
     tags.update(tags => tags.filter(t => t.id !== id));
     
-    // Clear filter if the removed tag was selected
+    // Remove tag from filter if it was selected
     const currentFilter = get(selectedTagFilter);
-    if (currentFilter === id) {
-        selectedTagFilter.set(null);
+    if (currentFilter.includes(id)) {
+        selectedTagFilter.set(currentFilter.filter(tagId => tagId !== id));
     }
 }
 
@@ -388,7 +388,19 @@ export async function removeTagFromSpot(spotId: string, tagId: string) {
 }
 
 export function setTagFilter(tagId: string | null) {
-    selectedTagFilter.set(tagId);
+    if (tagId === null) {
+        selectedTagFilter.set([]);
+        return;
+    }
+    
+    const currentFilters = get(selectedTagFilter);
+    if (currentFilters.includes(tagId)) {
+        // Remove tag if already selected
+        selectedTagFilter.set(currentFilters.filter(id => id !== tagId));
+    } else {
+        // Add tag if not selected
+        selectedTagFilter.set([...currentFilters, tagId]);
+    }
 }
 
 // Real-time subscription handlers

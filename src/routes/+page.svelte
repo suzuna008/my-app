@@ -113,7 +113,7 @@
     });
 
     // Use filtered categories when tag filter is active
-    $: displayCategories = $selectedTagFilter ? $filteredCategories : $categories;
+    $: displayCategories = $selectedTagFilter.length > 0 ? $filteredCategories : $categories;
     
     // Update markers whenever categories change
     $: if (map && displayCategories) {
@@ -715,6 +715,46 @@
         tagInputValue = '';
     }
 
+    // Get available tags (tags not already on this spot)
+    $: availableTags = (() => {
+        const spot = selectedSpotForTags;
+        if (!spot) return [];
+        const spotTagIds = (spot.tags || []).map(t => t.id);
+        return $tags.filter(tag => !spotTagIds.includes(tag.id));
+    })();
+
+    // Filter available tags based on input
+    $: filteredAvailableTags = tagInputValue.trim() 
+        ? availableTags.filter(tag => 
+            tag.name.toLowerCase().includes(tagInputValue.toLowerCase())
+        )
+        : availableTags;
+
+    // Add existing tag to spot
+    async function addExistingTagToSpot(tagId: string) {
+        if (!selectedSpotForTags || !$user) return;
+        
+        const spot = selectedSpotForTags; // Store reference
+        
+        try {
+            await addTagToSpot(spot.id, tagId);
+            tagInputValue = '';
+            
+            // Update selectedSpotForTags to reflect the new tag
+            const updatedCategories = get(categories);
+            for (const cat of updatedCategories) {
+                const updatedSpot = cat.spots.find((s: Spot) => s.id === spot.id);
+                if (updatedSpot) {
+                    selectedSpotForTags = updatedSpot;
+                    break;
+                }
+            }
+        } catch (e: any) {
+            console.error('Failed to add tag:', e);
+            alert('Failed to add tag: ' + (e?.message || 'Unknown error'));
+        }
+    }
+
     async function handleAddTagToSpot() {
         if (!selectedSpotForTags || !tagInputValue.trim()) return;
         if (!$user) {
@@ -785,7 +825,11 @@
     }
 
     function handleTagFilter(tagId: string | null) {
-        setTagFilter(tagId);
+        if (tagId === null) {
+            setTagFilter(null); // Clear all filters
+        } else {
+            setTagFilter(tagId); // Toggle this tag
+        }
     }
 
     // Load map-based categories from nearby places
@@ -1016,12 +1060,12 @@
             <div class="tag-filter-section">
                 <div class="tag-filter-header">
                     <h3>Filter by Tag</h3>
-                    {#if $selectedTagFilter}
+                    {#if $selectedTagFilter.length > 0}
                         <button 
                             type="button"
                             class="clear-filter-btn" 
                             on:click={() => handleTagFilter(null)}
-                            title="Clear filter"
+                            title="Clear all filters"
                         >
                             ✕
                         </button>
@@ -1035,10 +1079,13 @@
                             <button
                                 type="button"
                                 class="tag-chip"
-                                class:active={$selectedTagFilter === tag.id}
-                                on:click={() => handleTagFilter($selectedTagFilter === tag.id ? null : tag.id)}
+                                class:active={$selectedTagFilter.includes(tag.id)}
+                                on:click={() => handleTagFilter(tag.id)}
                             >
-                                {tag.name}
+                                {#if $selectedTagFilter.includes(tag.id)}
+                                    <span class="tag-checkmark">✓</span>
+                                {/if}
+                                <span class="tag-name">{tag.name}</span>
                             </button>
                         {/each}
                     {/if}
@@ -1050,8 +1097,8 @@
                     <div class="empty-state">Loading...</div>
                 {:else if displayCategories.length === 0}
                     <div class="empty-state">
-                        {#if $selectedTagFilter}
-                            <p>No spots match this tag</p>
+                        {#if $selectedTagFilter.length > 0}
+                            <p>No spots match the selected tags</p>
                         {:else}
                             <p>No lists yet</p>
                             <p>Click + to create one</p>
@@ -1210,17 +1257,49 @@
                 <button type="button" class="close" on:click={() => tagModalOpen = false}>&times;</button>
                 <h3>Manage Tags: {selectedSpotForTags.name}</h3>
                 
+                <!-- Available Tags Section -->
+                {#if availableTags.length > 0}
+                    <div class="available-tags-section">
+                        <h4>Available Tags:</h4>
+                        <div class="tags-list-modal">
+                            {#each filteredAvailableTags as tag}
+                                <button
+                                    type="button"
+                                    class="tag-chip-available"
+                                    on:click={() => addExistingTagToSpot(tag.id)}
+                                >
+                                    {tag.name}
+                                </button>
+                            {/each}
+                            {#if filteredAvailableTags.length === 0 && tagInputValue.trim()}
+                                <p class="no-matching-tags">No matching tags. Press Enter to create "{tagInputValue}"</p>
+                            {/if}
+                        </div>
+                    </div>
+                {/if}
+                
+                <!-- Add New Tag Section -->
                 <div class="tag-input-section">
                     <input 
                         type="text" 
                         bind:value={tagInputValue}
-                        on:keydown={(e) => e.key === 'Enter' && handleAddTagToSpot()}
-                        placeholder="Add a tag..."
+                        on:keydown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddTagToSpot();
+                            }
+                        }}
+                        placeholder="Type to search or create a new tag..."
                         class="tag-input"
                     >
-                    <button class="add-tag-btn" on:click={handleAddTagToSpot}>Add Tag</button>
+                    {#if tagInputValue.trim() && !availableTags.some(t => t.name.toLowerCase() === tagInputValue.trim().toLowerCase())}
+                        <button class="add-tag-btn" on:click={handleAddTagToSpot}>
+                            Add "{tagInputValue.trim()}"
+                        </button>
+                    {/if}
                 </div>
                 
+                <!-- Current Tags Section -->
                 <div class="current-tags-section">
                     <h4>Current Tags:</h4>
                     {#if selectedSpotForTags.tags && selectedSpotForTags.tags.length > 0}
@@ -1237,7 +1316,7 @@
                             {/each}
                         </div>
                     {:else}
-                        <p class="no-tags">No tags yet. Add tags to organize and filter spots.</p>
+                        <p class="no-tags">No tags yet. Click on available tags above or create a new one.</p>
                     {/if}
                 </div>
             </div>
