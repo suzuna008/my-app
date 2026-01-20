@@ -68,7 +68,6 @@
     let selectedSpotForTags: Spot | null = null;
     let newTagName = '';
     let tagInputValue = '';
-    let filterTagInput = '';
     let editingCategoryId: string | null = null;
     let editingCategoryName = '';
     
@@ -833,37 +832,6 @@
         }
     }
 
-    // Add new tag from filter section
-    async function handleAddTagFromFilter() {
-        if (!filterTagInput.trim()) return;
-        if (!$user) {
-            alert('Please sign in to create tags');
-            return;
-        }
-
-        try {
-            const tagName = filterTagInput.trim();
-            
-            // Check if tag already exists
-            const existingTag = $tags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-            if (existingTag) {
-                // Tag exists, just select it
-                setTagFilter(existingTag.id);
-                filterTagInput = '';
-                return;
-            }
-            
-            // Create new tag
-            const newTag = await addTag(tagName);
-            filterTagInput = '';
-            // Automatically select the newly created tag
-            setTagFilter(newTag.id);
-        } catch (e: any) {
-            console.error('Failed to add tag:', e);
-            alert('Failed to add tag: ' + (e?.message || 'Unknown error'));
-        }
-    }
-
     // Load map-based categories from nearby places
     async function loadMapCategories(lat: number, lng: number) {
         if (!placesService || loadingMapCategories) return;
@@ -1091,7 +1059,7 @@
             <!-- Tag Filter Section -->
             <div class="tag-filter-section">
                 <div class="tag-filter-header">
-                    <h3>Filter By Tag</h3>
+                    <h3>Filter by Tag</h3>
                     {#if $selectedTagFilter.length > 0}
                         <button 
                             type="button"
@@ -1103,40 +1071,11 @@
                         </button>
                     {/if}
                 </div>
-                
-                <!-- Add Tag Input -->
-                <div class="filter-tag-input-wrapper">
-                    <input 
-                        type="text" 
-                        bind:value={filterTagInput}
-                        on:keydown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddTagFromFilter();
-                            }
-                        }}
-                        placeholder="Add or search tags..."
-                        class="filter-tag-input"
-                    >
-                    {#if filterTagInput.trim()}
-                        <button 
-                            type="button"
-                            class="filter-add-tag-btn"
-                            on:click={handleAddTagFromFilter}
-                            title="Add tag"
-                        >
-                            +
-                        </button>
-                    {/if}
-                </div>
-                
                 <div class="tags-list">
-                    {#if $tags.length === 0 && !filterTagInput.trim()}
-                        <div class="empty-tags">No tags yet. Add one above!</div>
+                    {#if $tags.length === 0}
+                        <div class="empty-tags">No tags yet</div>
                     {:else}
-                        {#each $tags.filter(tag => 
-                            !filterTagInput.trim() || tag.name.toLowerCase().includes(filterTagInput.toLowerCase())
-                        ) as tag}
+                        {#each $tags as tag}
                             <button
                                 type="button"
                                 class="tag-chip"
@@ -1149,15 +1088,6 @@
                                 <span class="tag-name">{tag.name}</span>
                             </button>
                         {/each}
-                        {#if filterTagInput.trim() && !$tags.some(t => t.name.toLowerCase() === filterTagInput.trim().toLowerCase())}
-                            <button
-                                type="button"
-                                class="tag-chip tag-chip-new"
-                                on:click={handleAddTagFromFilter}
-                            >
-                                <span class="tag-name">+ {filterTagInput.trim()}</span>
-                            </button>
-                        {/if}
                     {/if}
                 </div>
             </div>
