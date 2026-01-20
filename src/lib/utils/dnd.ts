@@ -214,6 +214,15 @@ export function dragDrop(node: HTMLElement, options: DragDropOptions) {
         const item = target.closest('[data-draggable]') as HTMLElement;
         if (!item) return;
         
+        // Detect if this is a touch device
+        const isTouch = e.pointerType === 'touch' || ('ontouchstart' in window);
+        
+        // Check if parent container is scrollable
+        const parentContainer = item.closest('.categories-list, .spots-list, .tags-list, .tags-list-modal');
+        const isScrollable = parentContainer ? 
+            (parentContainer.scrollHeight > parentContainer.clientHeight || 
+             parentContainer.scrollWidth > parentContainer.clientWidth) : false;
+        
         const rect = item.getBoundingClientRect();
         startY = e.clientY;
         startX = e.clientX;
@@ -225,20 +234,46 @@ export function dragDrop(node: HTMLElement, options: DragDropOptions) {
         pendingDrag = { item, startY: e.clientY, startX: e.clientX, offsetY, offsetX };
         
         // Track movement - only start drag after threshold
+        // Use higher threshold for touch devices, especially if container is scrollable
+        const dragThreshold = isTouch ? (isScrollable ? 30 : 20) : 8;
+        let startTime = Date.now();
+        
         const handleMove = (moveEvent: PointerEvent) => {
             if (!pendingDrag) return;
             
             const moveDistanceY = Math.abs(moveEvent.clientY - pendingDrag.startY);
             const moveDistanceX = Math.abs(moveEvent.clientX - pendingDrag.startX);
             const moveDistance = Math.max(moveDistanceY, moveDistanceX);
+            const elapsedTime = Date.now() - startTime;
             
-            if (moveDistance > 8) {
-                hasMoved = true;
-                startDrag(pendingDrag.item, moveEvent);
-                pendingDrag = null;
-                document.removeEventListener('pointermove', handleMove);
-                document.removeEventListener('pointerup', handleUp);
+            // For touch devices with scrollable containers, prioritize scrolling
+            if (isTouch && isScrollable) {
+                // If movement is primarily vertical (scrolling), don't start drag
+                if (moveDistanceY > moveDistanceX * 1.5) {
+                    // User is scrolling, cancel drag
+                    pendingDrag = null;
+                    document.removeEventListener('pointermove', handleMove);
+                    document.removeEventListener('pointerup', handleUp);
+                    return;
+                }
+                
+                // Require more horizontal movement and/or time before starting drag
+                if (moveDistance < dragThreshold || (moveDistance < dragThreshold * 0.7 && elapsedTime < 200)) {
+                    return;
+                }
+            } else {
+                // For mouse or non-scrollable containers, use normal threshold
+                if (moveDistance < dragThreshold) {
+                    return;
+                }
             }
+            
+            // Start drag only if we've moved enough
+            hasMoved = true;
+            startDrag(pendingDrag.item, moveEvent);
+            pendingDrag = null;
+            document.removeEventListener('pointermove', handleMove);
+            document.removeEventListener('pointerup', handleUp);
         };
         
         const handleUp = () => {
@@ -247,14 +282,20 @@ export function dragDrop(node: HTMLElement, options: DragDropOptions) {
             document.removeEventListener('pointerup', handleUp);
         };
         
-        document.addEventListener('pointermove', handleMove);
+        // Use passive listener initially to allow scrolling
+        // We'll remove it and add a non-passive one when drag actually starts
+        document.addEventListener('pointermove', handleMove, { passive: true });
         document.addEventListener('pointerup', handleUp);
     }
     
     function startDrag(item: HTMLElement, e: PointerEvent) {
         if (isDragging) return;
         
+        // Only prevent default when we're actually starting to drag
+        // This allows normal scrolling to work
         e.preventDefault();
+        e.stopPropagation();
+        
         isDragging = true;
         draggedElement = item;
         
@@ -298,7 +339,9 @@ export function dragDrop(node: HTMLElement, options: DragDropOptions) {
     function handlePointerMove(e: PointerEvent) {
         if (!isDragging || !draggedElement) return;
         
+        // Only prevent default when actually dragging
         e.preventDefault();
+        e.stopPropagation();
         
         // Use requestAnimationFrame for smooth updates
         if (animationFrameId !== null) {
