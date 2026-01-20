@@ -132,7 +132,10 @@
             center: { lat: 37.7749, lng: -122.4194 },
             zoom: 13,
             styles: showPOIs ? [] : [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
-            mapTypeControl: false
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            clickableIcons: false
         });
 
         placesService = new google.maps.places.PlacesService(map);
